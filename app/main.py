@@ -20,18 +20,28 @@ class Ship:
         self.is_drowned = is_drowned
         self.decks = []
 
-        x_coord_first, y_coord_first = start
-        x_coord_second, y_coord_second = end
-        if x_coord_first == x_coord_second and y_coord_first == y_coord_second:
-            self.decks.append(Deck(x_coord_first, y_coord_first))
+        for coord in (start, end):
+            if not all(0 <= i <= 9 for i in coord):
+                raise ValueError(f"The coordinates"
+                                 f" {coord} are outside the 10x10 box")
 
-        elif y_coord_second > y_coord_first:
-            for i in range(y_coord_first, y_coord_second + 1):
-                self.decks.append(Deck(x_coord_first, i))
+        x1, y1 = start
+        x2, y2 = end
 
-        elif x_coord_second > x_coord_first:
-            for i in range(x_coord_first, x_coord_second + 1):
-                self.decks.append(Deck(i, y_coord_first))
+        if x1 != x2 and y1 != y2:
+            raise ValueError("Diagonal ships are prohibited")
+
+        x1, x2 = min(x1, x2), max(x1, x2)
+        y1, y2 = min(y1, y2), max(y1, y2)
+
+        if x1 == x2 and y1 == y2:
+            self.decks.append(Deck(x1, y1))
+        elif y2 > y1:
+            for i in range(y1, y2 + 1):
+                self.decks.append(Deck(x1, i))
+        elif x2 > x1:
+            for i in range(x1, x2 + 1):
+                self.decks.append(Deck(i, y1))
 
     def __repr__(self) -> str:
         return f"List Decks: ({self.decks}), Is_drowned: ({self.is_drowned}))"
@@ -55,20 +65,58 @@ class Ship:
 class Battleship:
     def __init__(self,
                  ships: list[tuple[tuple[int, int], tuple[int, int]]]) -> None:
-
         self.field = {}
+        self._create_ships(ships)
+        self._validate_field()
+
+    def _validate_field(self) -> None:
+        ships = set(self.field.values())
+
+        if len(ships) != 10:
+            raise ValueError("The field must contain exactly 10 ships.")
+
+        lengths = [len(ship.decks) for ship in ships]
+        expected = sorted([4, 3, 3, 2, 2, 2, 1, 1, 1, 1])
+        if sorted(lengths) != expected:
+            raise ValueError("Incorrect composition of ships.")
+
+        occupied = set(self.field.keys())
+        for (row, column) in occupied:
+            for dr in (-1, 0, 1):
+                for dc in (-1, 0, 1):
+                    if dr == dc == 0:
+                        continue
+                    if (row + dr, column + dc) in occupied:
+                        if (self.field[(row, column)]
+                                != self.field.get((row + dr, column + dc))):
+                            raise ValueError("Ships cannot"
+                                             " touch, even diagonally.")
+
+    def _create_ships(self,
+                      ships: list[tuple[tuple[int, int],
+                                        tuple[int, int]]]
+                      ) -> None:
+
         for start, end in ships:
             ship_object = Ship(start, end)
             for deck in ship_object.decks:
                 self.field[(deck.row, deck.column)] = ship_object
 
-    def fire(self, location: tuple) -> str:
-        if location not in self.field:
+    def fire(self, ceil: tuple) -> str:
+        if not isinstance(ceil, tuple) or len(ceil) != 2 \
+                or not all(isinstance(x, int) and 0 <= x <= 9 for x in ceil):
+            raise ValueError("The shot must be "
+                             "a tuple of two numbers from 0 to 9.")
+
+        if ceil not in self.field:
             return "Miss!"
-        else:
-            ship_object = self.field[location]
-            ship_object.fire(*location)
-            if ship_object.is_drowned is True:
-                return "Sunk!"
-            else:
-                return "Hit!"
+
+        ship_object = self.field[ceil]
+        deck = ship_object.get_deck(*ceil)
+        if not deck.is_alive:
+            return "Already hit!"
+
+        ship_object.fire(*ceil)
+        if ship_object.is_drowned:
+            return "Sunk!"
+        return "Hit!"
