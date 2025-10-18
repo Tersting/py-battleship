@@ -44,7 +44,7 @@ class Ship:
                 self.decks.append(Deck(i, y1))
 
     def __repr__(self) -> str:
-        return f"List Decks: ({self.decks}), Is_drowned: ({self.is_drowned}))"
+        return f"List Decks: ({self.decks}), Is_drowned: ({self.is_drowned})"
 
     def get_deck(self, row: int, column: int) -> Deck | None:
         # Find object ship in list ships (decks)
@@ -100,6 +100,9 @@ class Battleship:
         for start, end in ships:
             ship_object = Ship(start, end)
             for deck in ship_object.decks:
+                if (deck.row, deck.column) in self.field:
+                    raise ValueError(f"Overlapping ships "
+                                     f"at ({deck.row}, {deck.column})")
                 self.field[(deck.row, deck.column)] = ship_object
 
     def fire(self, ceil: tuple) -> str:
@@ -112,10 +115,6 @@ class Battleship:
             return "Miss!"
 
         ship_object = self.field[ceil]
-        deck = ship_object.get_deck(*ceil)
-        if not deck.is_alive:
-            return "Already hit!"
-
         ship_object.fire(*ceil)
         if ship_object.is_drowned:
             return "Sunk!"
